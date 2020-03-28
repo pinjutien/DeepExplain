@@ -193,11 +193,14 @@ class AttributionMethod(object):
                         raise RuntimeError('Baseline shape %s does not match expected shape %s'
                                            % (self.baseline[i].shape, self.X.get_shape().as_list()[1:]))
             else:
-                if list(self.baseline.shape) == self.X.get_shape().as_list()[1:]:
-                    self.baseline = np.expand_dims(self.baseline, 0)
-                else:
+                # if list(self.baseline.shape) == self.X.get_shape().as_list()[1:]:
+                #     self.baseline = np.expand_dims(self.baseline, 0)
+                # else:
+                #     raise RuntimeError('Baseline shape %s does not match expected shape %s'
+                #                        % (self.baseline.shape, self.X.get_shape().as_list()[1:]))
+                if list(self.baseline.shape)[1:] != self.X.get_shape().as_list()[1:]:
                     raise RuntimeError('Baseline shape %s does not match expected shape %s'
-                                       % (self.baseline.shape, self.X.get_shape().as_list()[1:]))
+                                       % (self.baseline.shape, self.X.get_shape().as_list()))
 
 
 class GradientBasedMethod(AttributionMethod):
