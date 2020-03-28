@@ -60,6 +60,7 @@ def explain_model(model_path):
         # Note1: Shapley Value sampling with 100 samples per feature (78400 runs) takes a couple of minutes on a GPU.
         # Note2: 100 samples are not enough for convergence, the result might be affected by sampling variance
         # attributions_sv     = de.explain('shapley_sampling', target_tensor, input_tensor, xs, ys=ys, samples=100)
+        return attributions_ig, attributions_ig_base_line, attributions_dl, attributions_dl_base_line
 
 
 if __name__ == '__main__':
