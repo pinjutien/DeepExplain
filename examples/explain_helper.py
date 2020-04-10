@@ -27,7 +27,7 @@ def load_image(image_path, base_image_path, file_name, labels, num_class):
     y_label = labels # apple
     return imag, y_label, base_imag
 
-def explain_model(model_path):
+def explain_model(model_path, imag, y_label, num_class, base_imag, explain_types, steps=100):
     model = tf.keras.models.load_model(model_path)
     with DeepExplain(session=tf.keras.backend.get_session()) as de:  # <-- init DeepExplain context
         # Need to reconstruct the graph in DeepExplain context, using the same weights.
@@ -46,13 +46,46 @@ def explain_model(model_path):
         xs = imag
         # ys = np.array([tf.keras.utils.to_categorical(y_label, 2)])
         ys = tf.keras.utils.to_categorical(y_label, num_class)
+        output = {}
+        for type_ in explain_types:
+            print("process {x}".format(x=type_))
+            if "_base" in type_:
+                assert base_imag is not None, "Please provide non-trivial baseline.{x}".format(x=type_)
+                attributions_base_ = de.explain(type_.split("_base")[0], target_tensor, input_tensor, xs, ys=ys, baseline=base_imag, steps=steps)
+                output[type_] = attributions_base_
+            else:
+                attributions_ = de.explain(type_, target_tensor, input_tensor, xs, ys=ys)
+                output[type_] = attributions_
 
+        # if "grad*input" in explain_types:
+        #     attributions_gradin = de.explain('grad*input', target_tensor, input_tensor, xs, ys=ys)
+        #     output["grad*input"] = attributions_gradin
+        # if "saliency" in explain_types:
+        #     attributions_sal   = de.explain('saliency', target_tensor, input_tensor, xs, ys=ys)
+        #     output["saliency"] = attributions_sal
+        # if "intgrad" in explain_types:
+        #     attributions_ig = de.explain('intgrad', target_tensor, input_tensor, xs, ys=ys)
+        #     output["intgrad"] = attributions_ig
+        # if "intgrad_base" in explain_types:
+        #     assert base_imag != None, "Please provide non-trivial baseline."
+        #     attributions_ig_base_line = de.explain('intgrad', target_tensor, input_tensor, xs, ys=ys,baseline=base_imag)
+        #     output["intgrad_base"] = attributions_ig_base_line
+        # if "deeplift" in explain_types:
+        #     attributions_dl = de.explain('deeplift', target_tensor, input_tensor, xs, ys=ys)
+        #     output["deeplift"] = attributions_dl
+        # if "deeplift_base" in explain_types:
+        #     attributions_dl_base_line = de.explain('deeplift', target_tensor, input_tensor, xs, ys=ys,baseline=base_imag)
+        #     output["deeplift_base"] = attributions_dl_base_line
+        # if "elrp" in explain_types:
+        #     attributions_elrp  = de.explain('elrp', target_tensor, input_tensor, xs, ys=ys)
+        #     output["elrp"] = attributions_elrp
+        
         # attributions_gradin = de.explain('grad*input', target_tensor, input_tensor, xs, ys=ys)
         #attributions_sal   = de.explain('saliency', target_tensor, input_tensor, xs, ys=ys)
-        attributions_ig    = de.explain('intgrad', target_tensor, input_tensor, xs, ys=ys)
-        attributions_ig_base_line = de.explain('intgrad', target_tensor, input_tensor, xs, ys=ys,baseline=base_imag)
-        attributions_dl = de.explain('deeplift', target_tensor, input_tensor, xs, ys=ys)
-        attributions_dl_base_line = de.explain('deeplift', target_tensor, input_tensor, xs, ys=ys,baseline=base_imag)
+        # attributions_ig    = de.explain('intgrad', target_tensor, input_tensor, xs, ys=ys)
+        # attributions_ig_base_line = de.explain('intgrad', target_tensor, input_tensor, xs, ys=ys,baseline=base_imag)
+        # attributions_dl = de.explain('deeplift', target_tensor, input_tensor, xs, ys=ys)
+        # attributions_dl_base_line = de.explain('deeplift', target_tensor, input_tensor, xs, ys=ys,baseline=base_imag)
         #attributions_elrp  = de.explain('elrp', target_tensor, input_tensor, xs, ys=ys)
         #attributions_occ   = de.explain('occlusion', target_tensor, input_tensor, xs, ys=ys)
 
@@ -60,7 +93,8 @@ def explain_model(model_path):
         # Note1: Shapley Value sampling with 100 samples per feature (78400 runs) takes a couple of minutes on a GPU.
         # Note2: 100 samples are not enough for convergence, the result might be affected by sampling variance
         # attributions_sv     = de.explain('shapley_sampling', target_tensor, input_tensor, xs, ys=ys, samples=100)
-        return attributions_ig, attributions_ig_base_line, attributions_dl, attributions_dl_base_line
+        # return attributions_ig, attributions_ig_base_line, attributions_dl, attributions_dl_base_line
+        return output
 
 
 if __name__ == '__main__':
@@ -71,4 +105,6 @@ if __name__ == '__main__':
     num_class = 2
     labels = [0,0,0,0]
     imag, y_label, base_imag = load_image(image_path, base_image_path, file_name, labels, num_class)
-    explain_model(model_path)
+    # (model_path, imag, y_label, num_class, base_imag)
+    attributions_ig, attributions_ig_base_line, attributions_dl, attributions_dl_base_line = explain_model(model_path, imag, y_label, num_class, base_imag)
+    
