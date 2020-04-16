@@ -27,7 +27,9 @@ def load_image(image_path, base_image_path, file_name, labels, num_class):
     y_label = labels # apple
     return imag, y_label, base_imag
 
-def explain_model(model_path, imag, y_label, num_class, base_imag, explain_types, steps=100):
+def explain_model(model_path, imag, y_label, num_class, base_imag, explain_types, steps=100 ,stochastic_mask_flag=False):
+    tf.keras.backend.clear_session()
+    # tf.reset_default_graph()
     model = tf.keras.models.load_model(model_path)
     with DeepExplain(session=tf.keras.backend.get_session()) as de:  # <-- init DeepExplain context
         # Need to reconstruct the graph in DeepExplain context, using the same weights.
@@ -51,10 +53,11 @@ def explain_model(model_path, imag, y_label, num_class, base_imag, explain_types
             print("process {x}".format(x=type_))
             if "_base" in type_:
                 assert base_imag is not None, "Please provide non-trivial baseline.{x}".format(x=type_)
-                attributions_base_ = de.explain(type_.split("_base")[0], target_tensor, input_tensor, xs, ys=ys, baseline=base_imag, steps=steps)
+                attributions_base_ = de.explain(type_.split("_base")[0], target_tensor, input_tensor, xs, ys=ys,
+                                                baseline=base_imag, steps=steps, stochastic_mask_flag=stochastic_mask_flag)
                 output[type_] = attributions_base_
             else:
-                attributions_ = de.explain(type_, target_tensor, input_tensor, xs, ys=ys)
+                attributions_ = de.explain(type_, target_tensor, input_tensor, xs, ys=ys, baseline=None, steps=steps, stochastic_mask_flag=stochastic_mask_flag)
                 output[type_] = attributions_
 
         # if "grad*input" in explain_types:
