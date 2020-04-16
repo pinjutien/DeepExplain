@@ -287,18 +287,49 @@ https://arxiv.org/pdf/1703.01365.pdf
 
 class IntegratedGradients(GradientBasedMethod):
 
-    def __init__(self, T, X, session, keras_learning_phase, steps=100, baseline=None):
+    def __init__(self, T, X, session, keras_learning_phase, steps=100, baseline=None, stochastic_mask_flag=False):
         self.steps = steps
         self.baseline = baseline
+        self.s_mask = 1
+        self.stochastic_mask_flag = stochastic_mask_flag
         super(IntegratedGradients, self).__init__(T, X, session, keras_learning_phase)
-
+        
+    def stochastic_mask(self, xs, condition):
+        if condition:
+            # the ideal: the greater the x-b, the higher chance the important feature is.
+            # print("[!!!!!] Use stochastic mask in image - baseline.", flush=True)
+            s_mask = []
+            mask_shape = xs.shape
+            assert len(mask_shape) == 4
+            num_inputs = mask_shape[0]
+            for i in range(num_inputs):
+                x = xs[i]
+                b = self.baseline[i]
+                abs_diff = (abs(x - b))**2
+                probs = (abs_diff/np.sum(abs_diff)).reshape(-1)
+                s_mask += [ np.random.choice([0,1], 1, p=[1-x, x])[0] for x in probs ]
+                del x, b, probs
+            s_mask = np.array(s_mask).reshape(mask_shape)
+        else:
+            s_mask = 1
+        return s_mask
+        
     def run(self, xs, ys=None, batch_size=None):
         self._check_input_compatibility(xs, ys, batch_size)
 
         gradient = None
+        condition = (self.baseline is not None) and self.stochastic_mask_flag
+        if condition: print("[!!!!!] Use stochastic mask in image - baseline.")
+
+        # if condition: print("[!!!!!] Use stochastic mask in image - baseline.")
         for alpha in list(np.linspace(1. / self.steps, 1.0, self.steps)):
-            xs_mod = [b + (x - b) * alpha for x, b in zip(xs, self.baseline)] if self.has_multiple_inputs \
-                else self.baseline + (xs - self.baseline) * alpha
+            if condition:
+                self.s_mask = self.stochastic_mask(xs, condition)
+                assert xs.shape == self.s_mask.shape                
+            else:
+                self.s_mask = 1
+            xs_mod = [b + (x - b)*self.s_mask * alpha for x, b in zip(xs, self.baseline)] if self.has_multiple_inputs \
+                else self.baseline + (xs - self.baseline)*self.s_mask * alpha
             _attr = self._session_run(self.explain_symbolic(), xs_mod, ys, batch_size)
             if gradient is None: gradient = _attr
             else: gradient = [g + a for g, a in zip(gradient, _attr)]
@@ -307,7 +338,6 @@ class IntegratedGradients(GradientBasedMethod):
             gradient,
             xs if self.has_multiple_inputs else [xs],
             self.baseline if self.has_multiple_inputs else [self.baseline])]
-
         return results[0] if not self.has_multiple_inputs else results
 
 
@@ -349,7 +379,7 @@ class DeepLIFTRescale(GradientBasedMethod):
 
     _deeplift_ref = {}
 
-    def __init__(self, T, X, session, keras_learning_phase, baseline=None):
+    def __init__(self, T, X, session, keras_learning_phase, baseline=None, **kwargs):
         self.baseline = baseline
         super(DeepLIFTRescale, self).__init__(T, X, session, keras_learning_phase)
 
