@@ -308,6 +308,9 @@ class IntegratedGradients(GradientBasedMethod):
                 abs_diff = (abs(x - b))**2
                 probs = (abs_diff/np.sum(abs_diff)).reshape(-1)
                 s_mask += [ np.random.choice([0,1], 1, p=[1-x, x])[0] for x in probs ]
+                # abs_diff = abs(x - b)
+                # probs = None
+                # s_mask += [abs_diff/np.sum(abs_diff)]
                 del x, b, probs
             s_mask = np.array(s_mask).reshape(mask_shape)
         else:
@@ -318,26 +321,49 @@ class IntegratedGradients(GradientBasedMethod):
         self._check_input_compatibility(xs, ys, batch_size)
 
         gradient = None
-        condition = (self.baseline is not None) and self.stochastic_mask_flag
-        if condition: print("[!!!!!] Use stochastic mask in image - baseline.")
+        condition = self.stochastic_mask_flag
+        num_images = xs.shape[0]
+        if condition:
+            print("[!!!!!] Use additional mask in IG.")
+            self.s_mask = []                    
+            mask_str = self.stochastic_mask_flag
+            self.delta_images = (xs - self.baseline)
+            for i in range(num_images):
+                dd_image = self.delta_images[i]
+                m = mask_str[i]
+                self.s_mask += [eval("dd_image" + m)]
+            self.s_mask = np.array(self.s_mask)
 
-        # if condition: print("[!!!!!] Use stochastic mask in image - baseline.")
         for alpha in list(np.linspace(1. / self.steps, 1.0, self.steps)):
             if condition:
-                self.s_mask = self.stochastic_mask(xs, condition)
-                assert xs.shape == self.s_mask.shape                
+                # self.s_mask = self.stochastic_mask(xs, condition)
+                # assert xs.shape == self.s_mask.shape
+                # print("manually mask 6: ", mm)
+                # self.s_mask = (xs - self.baseline) <= mm
+                xs_mod = self.baseline + self.delta_images*self.s_mask * alpha
+                _attr = self._session_run(self.explain_symbolic(), xs_mod, ys, batch_size)
+                if gradient is None: gradient = _attr
+                else: gradient = [g + a for g, a in zip(gradient, _attr)]
             else:
-                self.s_mask = 1
-            xs_mod = [b + (x - b)*self.s_mask * alpha for x, b in zip(xs, self.baseline)] if self.has_multiple_inputs \
-                else self.baseline + (xs - self.baseline)*self.s_mask * alpha
-            _attr = self._session_run(self.explain_symbolic(), xs_mod, ys, batch_size)
-            if gradient is None: gradient = _attr
-            else: gradient = [g + a for g, a in zip(gradient, _attr)]
+                xs_mod = [b + (x - b) * alpha for x, b in zip(xs, self.baseline)] if self.has_multiple_inputs \
+                    else self.baseline + (xs - self.baseline)* alpha
+                _attr = self._session_run(self.explain_symbolic(), xs_mod, ys, batch_size)
+                if gradient is None: gradient = _attr
+                else: gradient = [g + a for g, a in zip(gradient, _attr)]
 
-        results = [g * (x - b) / self.steps for g, x, b in zip(
-            gradient,
-            xs if self.has_multiple_inputs else [xs],
-            self.baseline if self.has_multiple_inputs else [self.baseline])]
+        if condition:
+            mask_str = self.stochastic_mask_flag
+            results = [g * (x - b)* (eval("(x - b)" + m)) / self.steps for g, x, b, m in zip(
+                gradient,
+                xs if self.has_multiple_inputs else [xs],
+                self.baseline if self.has_multiple_inputs else [self.baseline],
+                mask_str)
+            ]
+        else:
+            results = [g * (x - b) / self.steps for g, x, b in zip(
+                gradient,
+                xs if self.has_multiple_inputs else [xs],
+                self.baseline if self.has_multiple_inputs else [self.baseline])]
         return results[0] if not self.has_multiple_inputs else results
 
 
