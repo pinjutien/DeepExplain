@@ -57,7 +57,7 @@ def explain_model(model_path, imag, y_label, num_class, base_imag, explain_types
                                                 baseline=base_imag, steps=steps, stochastic_mask_flag=stochastic_mask_flag)
                 output[type_] = attributions_base_
             else:
-                attributions_ = de.explain(type_, target_tensor, input_tensor, xs, ys=ys, baseline=None, steps=steps, stochastic_mask_flag=stochastic_mask_flag)
+                attributions_ = de.explain(type_, target_tensor, input_tensor, xs, ys=ys, baseline=None, steps=steps, stochastic_mask_flag=False)
                 output[type_] = attributions_
 
         # if "grad*input" in explain_types:
