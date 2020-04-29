@@ -405,11 +405,25 @@ class DeepLIFTRescale(GradientBasedMethod):
 
     _deeplift_ref = {}
 
-    def __init__(self, T, X, session, keras_learning_phase, baseline=None, **kwargs):
+    def __init__(self, T, X, session, keras_learning_phase, baseline=None, stochastic_mask_flag=False, **kwargs):
         self.baseline = baseline
+        self.stochastic_mask_flag = stochastic_mask_flag
         super(DeepLIFTRescale, self).__init__(T, X, session, keras_learning_phase)
 
     def get_symbolic_attribution(self):
+        if self.stochastic_mask_flag:
+            print("[!!!!!] Use additional mask in DeepLIFT")            
+            mask_str = self.stochastic_mask_flag
+            num_images = self.baseline.shape[0]
+            gs = tf.gradients(self.T, self.X)[0]
+            res = []
+            for i in range(num_images):
+                g = gs[i, :, :, :]
+                x = self.X[i, :, :, :]
+                b = self.baseline[i]
+                m = tf.cast(eval("(x - b)" + mask_str[i]), dtype=tf.float32)
+                res += [g * (x - b)*m]
+            return [tf.stack(res)]
         return [g * (x - b) for g, x, b in zip(
             tf.gradients(self.T, self.X),
             self.X if self.has_multiple_inputs else [self.X],
