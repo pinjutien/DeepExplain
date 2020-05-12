@@ -316,7 +316,7 @@ class IntegratedGradients(GradientBasedMethod):
         else:
             s_mask = 1
         return s_mask
-        
+    
     def run(self, xs, ys=None, batch_size=None):
         self._check_input_compatibility(xs, ys, batch_size)
 
@@ -338,8 +338,8 @@ class IntegratedGradients(GradientBasedMethod):
             if condition:
                 # self.s_mask = self.stochastic_mask(xs, condition)
                 # assert xs.shape == self.s_mask.shape
-                # print("manually mask 6: ", mm)
                 # self.s_mask = (xs - self.baseline) <= mm
+                # xs_mod = self.baseline + self.delta_images*self.s_mask * alpha + self.delta_images*(1-self.s_mask)
                 xs_mod = self.baseline + self.delta_images*self.s_mask * alpha
                 _attr = self._session_run(self.explain_symbolic(), xs_mod, ys, batch_size)
                 if gradient is None: gradient = _attr
