@@ -2,6 +2,11 @@ import pandas as pd
 import PIL
 import tensorflow as tf
 import numpy as np
+from sklearn.neighbors import KernelDensity
+from scipy.signal import argrelextrema
+from scipy.stats import iqr
+from utils import plot, plt
+import glob
 import sys, os
 sys.path.insert(0, os.path.abspath('..'))
 from deepexplain.tensorflow import DeepExplain
@@ -100,14 +105,125 @@ def explain_model(model_path, imag, y_label, num_class, base_imag, explain_types
         return output
 
 
-if __name__ == '__main__':
-    image_path = "/Users/ptien/tfds-download/apple2orange/testA/"
-    base_image_path = "/Users/ptien/tfds-download/apple2orange/experiment2-500000/generated_y/"
-    file_name = ["n07740461_10011.jpg", "n07740461_240.jpg", "n07740461_14960.jpg", "n07740461_2770.jpg"]
-    model_path = "/Users/ptien/DeepLearning/research/gan/apple2orange.h5"
-    num_class = 2
-    labels = [0,0,0,0]
-    imag, y_label, base_imag = load_image(image_path, base_image_path, file_name, labels, num_class)
-    # (model_path, imag, y_label, num_class, base_imag)
-    attributions_ig, attributions_ig_base_line, attributions_dl, attributions_dl_base_line = explain_model(model_path, imag, y_label, num_class, base_imag)
+def kernel_density(original_image, gan_image, file_name, bandwidth = 0.02, op="min", 
+                   filter_=True, custom_std=False, iqr_choice=False):
+    num_fig = original_image.shape[0]
+    assert num_fig == len(file_name), "Number of figure is not the same."
+    diff_image_base = original_image - gan_image
+    X_plot = np.linspace(-1, 1, 1000)[:, np.newaxis]
+    bins = np.linspace(-1, 1, 1000)
+    local_min_max = {}
+    comparison_op = {
+        "min": np.less,
+        "max": np.greater
+    }
+    print("compare operator: {x}".format(x=op))
+    kernel_arr = []
+    for i in range(num_fig):
+        X = diff_image_base[i].reshape(-1,1)
+        n = len(X)
+        if custom_std:
+            bandwidth = custom_std*X.std()
+        if iqr_choice:
+            # import pdb; pdb.set_trace()
+            iqr_num = iqr(X)
+            bandwidth = 0.9* min(X.std(), iqr_num/1.34)*pow(n, -0.2)
+            
+        if filter_:
+            X = [ xx for xx in X if abs(xx) >= bandwidth]
+        # Gaussian KDE
+        kde = KernelDensity(kernel='gaussian', bandwidth=bandwidth).fit(X)
+        log_dens = kde.score_samples(X_plot)
+        kernel_arr += [log_dens]
+        
+        compare_op = comparison_op[op]
+        kernel_y = np.exp(log_dens)
+        local_indexs = argrelextrema(kernel_y, compare_op)[0]
+        local_min_max[file_name[i]] = X_plot[local_indexs]
+        del X
+    return kernel_arr, local_min_max, X_plot
+
+
+def load_batch_images(image_paths, file_name):
+    res = []
+    for p in image_paths:
+        res_p = []
+        for f in file_name:
+            path_ = p + f
+            imag_temp = tf.keras.preprocessing.image.load_img(path_, target_size=(256, 256, 3))
+            input_np= tf.keras.preprocessing.image.img_to_array(imag_temp)/255.
+            res_p += [input_np]
+        res += [res_p]
+    res = np.array(res)
+    return res
+
+
+def show_kd_plot(image_paths, file_name, filter_=False, output=None, custom_std=False, iqr_choice=False):
+    images_collection = load_batch_images(image_paths, file_name)
+    original_imag = images_collection[0]
+    gan_imag = images_collection[1]
+    kernel_arr, local_min_max, X_plot = kernel_density(original_imag, gan_imag, file_name, 
+                                                       bandwidth = 0.02, op="min", filter_=filter_, 
+                                                       custom_std=custom_std, iqr_choice=iqr_choice)
+    gan_imag2 = images_collection[2]
+    kernel_arr2, local_min_max2, X_plot2 = kernel_density(original_imag, gan_imag2, file_name, 
+                                                          bandwidth = 0.02, op="min", filter_=filter_,
+                                                         custom_std=custom_std, iqr_choice=iqr_choice)
+    gan_imag3 = images_collection[3]
+    kernel_arr3, local_min_max3, X_plot3 = kernel_density(original_imag, gan_imag3, file_name, 
+                                                          bandwidth = 0.02, op="min", filter_=filter_,
+                                                         custom_std=custom_std, iqr_choice=iqr_choice)
+    nrows = len(file_name)
+    ncols = 5
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(3*ncols, 3*nrows))
+    axes = axes.reshape(nrows, ncols)
+    y_min,y_max = 0, 10
+    for i in range(nrows):
+        # a4 = attributions_dl_base_line[i]
+        axes[i, 0].imshow(original_imag[i])# .set_title('Original')
+        axes[i, 1].imshow(gan_imag[i])# .set_title('gan-1')
+        axes[i, 2].imshow(gan_imag2[i])# .set_title('gan-2')
+        axes[i, 3].imshow(gan_imag3[i])# .set_title('gan-3')
+        log_dens = kernel_arr[i]
+        log_dens2 = kernel_arr2[i]
+        log_dens3 = kernel_arr3[i]
+        axes[i, 4].fill(X_plot[:, 0], np.exp(log_dens), fc='green', alpha=0.5, label="gan-1")
+        axes[i, 4].fill(X_plot2[:, 0], np.exp(log_dens2), fc='blue', alpha=0.3, label="gan-2")
+        axes[i, 4].fill(X_plot3[:, 0], np.exp(log_dens3), fc='red', alpha=0.5, label="gan-3")
+        axes[i, 4].axvline(0, y_min, y_max, c="gray", alpha=0.1)
+        # axes[i, 0].text(0, 5, str(i))
+        axes[i, 4].set_ylim([y_min,y_max])
     
+    if output:
+        fig.savefig(output)
+
+
+if __name__ == '__main__':
+    # image_path = "/Users/ptien/tfds-download/apple2orange/testA/"
+    # gan_image_path_1 = "/Users/ptien/tfds-download/apple2orange/experiment2-500000/generated_y/generated_from_"
+    # gan_image_path_2 = "/Users/ptien/tfds-download/apple2orange/experiment-1000/generated_y/generated_from_"
+    # gan_image_path_3 = "/Users/ptien/tfds-download/apple2orange/experiment-0/generated_y/generated_from_"
+
+    image_path = "/Users/ptien/tfds-download/horse2zebra/testA/"
+    gan_image_path_1 = "/Users/ptien/tfds-download/horse2zebra/experiment-500000/generated_y/generated_from_"
+    gan_image_path_2 = "/Users/ptien/tfds-download/horse2zebra/experiment-1000/generated_y/generated_from_"
+    gan_image_path_3 = "/Users/ptien/tfds-download/horse2zebra/experiment-0/generated_y/generated_from_"
+    
+    image_paths = [image_path, gan_image_path_1, gan_image_path_2, gan_image_path_3]
+    all_images = glob.glob(image_path + "*.jpg")
+    batch_size = 10
+    # file_name = ["n07740461_240.jpg", "n07740461_411.jpg", "n07740461_14960.jpg", 
+    #              "n07740461_40.jpg", "n07740461_1690.jpg", "n07740461_12921.jpg"]
+
+    # show_kd_plot(image_paths, file_name, filter_=False, output="gan_performance_a2o.jpg", 
+    #          custom_std=False, iqr_choice=True)
+    c = 0
+    total_images = len(all_images)
+    while len(all_images) > 0:
+        print(c, total_images, len(all_images))
+        batch_images = all_images[:batch_size]
+        batch_images = [ f.split("/")[-1] for f in batch_images]
+        show_kd_plot(image_paths, batch_images, filter_=False, output="gan_performance_h2z_batch_{c}.jpg".format(c=c),
+                 custom_std=False, iqr_choice=True)
+        all_images = all_images[batch_size:]
+        c += 1
