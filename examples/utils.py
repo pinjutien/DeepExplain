@@ -1,6 +1,10 @@
 from skimage import feature, transform
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.stats import norm
+from sklearn.neighbors import KernelDensity
+from scipy.signal import argrelextrema
+from scipy.stats import iqr
 
 
 def plot(data, xi=None, cmap='RdBu_r', axis=plt, percentile=100, dilation=3.0, alpha=0.8):
@@ -34,3 +38,43 @@ def plot(data, xi=None, cmap='RdBu_r', axis=plt, percentile=100, dilation=3.0, a
         axis.imshow(overlay, extent=extent, interpolation='none', cmap=cmap_xi, alpha=alpha)
     axis.axis('off')
     return axis
+
+
+
+def kernel_density(original_image, gan_image, file_name, bandwidth = 0.02, op="min", 
+                   filter_=True, custom_std=False, iqr_choice=False):
+    num_fig = original_image.shape[0]
+    assert num_fig == len(file_name), "Number of figure is not the same."
+    diff_image_base = original_image - gan_image
+    X_plot = np.linspace(-1, 1, 1000)[:, np.newaxis]
+    bins = np.linspace(-1, 1, 1000)
+    local_min_max = {}
+    comparison_op = {
+        "min": np.less,
+        "max": np.greater
+    }
+    print("compare operator: {x}".format(x=op))
+    kernel_arr = []
+    for i in range(num_fig):
+        X = diff_image_base[i].reshape(-1,1)
+        n = len(X)
+        if custom_std:
+            bandwidth = custom_std*X.std()
+        if iqr_choice:
+            # import pdb; pdb.set_trace()
+            iqr_num = iqr(X)
+            bandwidth = 0.9* min(X.std(), iqr_num/1.34)*pow(n, -0.2)
+            
+        if filter_:
+            X = [ xx for xx in X if abs(xx) >= bandwidth]
+        # Gaussian KDE
+        kde = KernelDensity(kernel='gaussian', bandwidth=bandwidth).fit(X)
+        log_dens = kde.score_samples(X_plot)
+        kernel_arr += [log_dens]
+        
+        compare_op = comparison_op[op]
+        kernel_y = np.exp(log_dens)
+        local_indexs = argrelextrema(kernel_y, compare_op)[0]
+        local_min_max[file_name[i]] = X_plot[local_indexs]
+        del X
+    return kernel_arr, local_min_max, X_plot
