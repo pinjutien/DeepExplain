@@ -1,6 +1,8 @@
 from skimage import feature, transform
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
+plt.switch_backend('agg')
 from scipy.stats import norm
 from sklearn.neighbors import KernelDensity
 from scipy.signal import argrelextrema

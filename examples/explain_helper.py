@@ -12,7 +12,9 @@ sys.path.insert(0, os.path.abspath('..'))
 from deepexplain.tensorflow import DeepExplain
 
 
-def load_image(image_path, base_image_path, file_name, labels, num_class):
+def load_image(image_path, base_image_path, file_name, labels, num_class,
+               target_size=(256, 256, 3),
+               normalized_factor=255.0):
     assert len(labels) == len(file_name), "length of labels and file_name should be the same."
     image_array = []
     base_image_array = []
@@ -21,10 +23,10 @@ def load_image(image_path, base_image_path, file_name, labels, num_class):
         # base_path = "/Users/ptien/tfds-download/apple2orange/experiment2-500000/generated_y/generated_from_" + f
         imag_path = image_path + f
         base_path = base_image_path + "generated_from_" + f
-        imag_temp = tf.keras.preprocessing.image.load_img(imag_path, target_size=(256, 256, 3))
-        base_imag_temp = tf.keras.preprocessing.image.load_img(base_path, target_size=(256, 256, 3))
-        input_np= tf.keras.preprocessing.image.img_to_array(imag_temp)/255.
-        base_input_np = tf.keras.preprocessing.image.img_to_array(base_imag_temp)/255.
+        imag_temp = tf.keras.preprocessing.image.load_img(imag_path, target_size=target_size)
+        base_imag_temp = tf.keras.preprocessing.image.load_img(base_path, target_size=target_size)
+        input_np= tf.keras.preprocessing.image.img_to_array(imag_temp)/normalized_factor
+        base_input_np = tf.keras.preprocessing.image.img_to_array(base_imag_temp)/normalized_factor
         image_array += [input_np]
         base_image_array += [base_input_np]
     imag = np.array(image_array, dtype=np.float)
