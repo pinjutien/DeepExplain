@@ -10,6 +10,7 @@ import glob
 import sys, os
 sys.path.insert(0, os.path.abspath('..'))
 from deepexplain.tensorflow import DeepExplain
+from get_labels_data import get_baseline_data
 
 
 def load_image(image_path, base_image_path, file_name, labels, num_class,
@@ -34,7 +35,15 @@ def load_image(image_path, base_image_path, file_name, labels, num_class,
     y_label = labels # apple
     return imag, y_label, base_imag
 
-def explain_model(model_path, imag, y_label, num_class, base_imag, explain_types, steps=100 ,stochastic_mask_flag=False):
+def explain_model(model_path,
+                  imag,
+                  y_label,
+                  num_class,
+                  base_imag,
+                  explain_types,
+                  steps=100,
+                  stochastic_mask_flag=False,
+                  data_type="mnist"):
     tf.keras.backend.clear_session()
     # tf.reset_default_graph()
     model = tf.keras.models.load_model(model_path)
@@ -63,6 +72,13 @@ def explain_model(model_path, imag, y_label, num_class, base_imag, explain_types
                 attributions_base_ = de.explain(type_.split("_base")[0], target_tensor, input_tensor, xs, ys=ys,
                                                 baseline=base_imag, steps=steps, stochastic_mask_flag=stochastic_mask_flag)
                 output[type_] = attributions_base_
+            elif type_ == "expected_intgrad":
+                # import pdb; pdb.set_trace()
+                base_for_exp_ig = get_baseline_data(data_type, y_label, subsample=steps)
+                attributions_ = de.explain("intgrad", target_tensor, input_tensor, xs, ys=ys,
+                                           baseline=base_for_exp_ig, steps=steps, stochastic_mask_flag=type_)
+                output[type_] = attributions_
+                
             else:
                 attributions_ = de.explain(type_, target_tensor, input_tensor, xs, ys=ys, baseline=None, steps=steps, stochastic_mask_flag=False)
                 output[type_] = attributions_

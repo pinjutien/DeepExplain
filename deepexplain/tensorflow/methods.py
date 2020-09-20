@@ -84,7 +84,8 @@ class AttributionMethod(object):
 
         # Set baseline
         # TODO: now this sets a baseline also for those methods that does not require it
-        self._set_check_baseline()
+        if self.baseline is None or len(self.baseline.shape) == len(self.X.shape):
+            self._set_check_baseline()
 
         # References
         self._init_references()
@@ -295,7 +296,7 @@ class IntegratedGradients(GradientBasedMethod):
         super(IntegratedGradients, self).__init__(T, X, session, keras_learning_phase)
         
     def stochastic_mask(self, xs, condition):
-        if condition:
+        if condition is True:
             # the ideal: the greater the x-b, the higher chance the important feature is.
             # print("[!!!!!] Use stochastic mask in image - baseline.", flush=True)
             s_mask = []
@@ -323,7 +324,7 @@ class IntegratedGradients(GradientBasedMethod):
         gradient = None
         condition = self.stochastic_mask_flag
         num_images = xs.shape[0]
-        if condition:
+        if condition is True:
             print("[!!!!!] Use additional mask in IG.")
             self.s_mask = []                    
             mask_str = self.stochastic_mask_flag
@@ -333,9 +334,10 @@ class IntegratedGradients(GradientBasedMethod):
                 m = mask_str[i]
                 self.s_mask += [eval("dd_image" + m)]
             self.s_mask = np.array(self.s_mask)
-
+        exp_ig_res = []
+        exp_ig_count = 0
         for alpha in list(np.linspace(1. / self.steps, 1.0, self.steps)):
-            if condition:
+            if condition is True:
                 # self.s_mask = self.stochastic_mask(xs, condition)
                 # assert xs.shape == self.s_mask.shape
                 # self.s_mask = (xs - self.baseline) <= mm
@@ -344,6 +346,17 @@ class IntegratedGradients(GradientBasedMethod):
                 _attr = self._session_run(self.explain_symbolic(), xs_mod, ys, batch_size)
                 if gradient is None: gradient = _attr
                 else: gradient = [g + a for g, a in zip(gradient, _attr)]
+            elif condition == "expected_intgrad":
+                baseline = self.baseline[:, exp_ig_count, :, :]
+                alpha_ = np.random.uniform(0,1, 1)[0]
+                xs_mod = [b + (x - b) * alpha for x, b in zip(xs, baseline)] if self.has_multiple_inputs \
+                    else baseline + (xs - baseline)* alpha_
+                _attr = self._session_run(self.explain_symbolic(), xs_mod, ys, batch_size)
+                _attr[0] = (xs - baseline)* _attr[0]
+                # exp_ig_res += [(xs - baseline)* _attr[0]]
+                if gradient is None: gradient = _attr
+                else: gradient = [g + a for g, a in zip(gradient, _attr)]                
+                exp_ig_count += 1
             else:
                 xs_mod = [b + (x - b) * alpha for x, b in zip(xs, self.baseline)] if self.has_multiple_inputs \
                     else self.baseline + (xs - self.baseline)* alpha
@@ -351,7 +364,7 @@ class IntegratedGradients(GradientBasedMethod):
                 if gradient is None: gradient = _attr
                 else: gradient = [g + a for g, a in zip(gradient, _attr)]
 
-        if condition:
+        if condition is True:
             mask_str = self.stochastic_mask_flag
             results = [g * (x - b)* (eval("(x - b)" + m)) / self.steps for g, x, b, m in zip(
                 gradient,
@@ -359,6 +372,8 @@ class IntegratedGradients(GradientBasedMethod):
                 self.baseline if self.has_multiple_inputs else [self.baseline],
                 mask_str)
             ]
+        elif condition == "expected_intgrad":
+            results = [gradient[0]/self.steps]
         else:
             results = [g * (x - b) / self.steps for g, x, b in zip(
                 gradient,
