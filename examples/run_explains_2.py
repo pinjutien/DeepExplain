@@ -25,6 +25,8 @@ def summary_plot(nrows, ncols, output, imag, base_imag, output_path):
     attributions_ig_base_line = output["intgrad_base"]
     attributions_dl = output["deeplift"]
     attributions_dl_base_line = output["deeplift_base"]
+    attributions_exp_ig = output["expected_intgrad"]
+    attributions_occ = output["occlusion"]
     fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(3*ncols, 3*nrows))
     axes = axes.reshape(nrows, ncols)
     for i in range(nrows):
@@ -32,6 +34,8 @@ def summary_plot(nrows, ncols, output, imag, base_imag, output_path):
         a2 = attributions_ig_base_line[i]
         a3 = attributions_dl[i]
         a4 = attributions_dl_base_line[i]
+        a5 = attributions_exp_ig[i]
+        a6 = attributions_occ[i]        
         (h,w,c) = imag[i].shape
         if c == 1:
             axes[i, 0].imshow(np.squeeze(imag[i])) # .title('Original')
@@ -43,6 +47,8 @@ def summary_plot(nrows, ncols, output, imag, base_imag, output_path):
         plot(a2, axis=axes[i,3]).set_title('intgrad_base')
         plot(a3, axis=axes[i,4]).set_title('deeplift')
         plot(a4, axis=axes[i, 5]).set_title('deeplift_base')
+        plot(a5, axis=axes[i, 6]).set_title('expected_ig')
+        plot(a6, axis=axes[i, 7]).set_title('occlusion')        
         # kernel_arr += [log_dens]
         # log_dens = kernel_arr[i]
         # axes[i, 6].fill(X_plot[:, 0], np.exp(log_dens), fc='#AAAAFF')
@@ -55,7 +61,7 @@ def summary_plot(nrows, ncols, output, imag, base_imag, output_path):
 
 def load_image_v1(baseline_target, base_image_path, all_images,
                   target_size=(256, 256, 3),
-                  normalized_factor=255.0):
+                  normalized_factor=255.0, baseline_type="gan"):
     # assert len(labels) == len(file_name), "length of labels and file_name should be the same."
     image_array = []
     (h, w, c) = target_size
@@ -67,7 +73,10 @@ def load_image_v1(baseline_target, base_image_path, all_images,
         # imag_path = image_path + f
         file_name = os.path.basename(image_f)
         prefix_file_name = os.path.basename(file_name).split(".")[0]
-        baseline_f = prefix_file_name + f"_transformed_{baseline_target}.png"
+        if baseline_type == "gan":
+            baseline_f = prefix_file_name + f"_transformed_{baseline_target}.png"
+        elif baseline_type == "closet":
+            baseline_f = prefix_file_name + f"_closest_{baseline_target}.png"            
         base_path = os.path.join(base_image_path, baseline_f)
         if not os.path.exists(base_path):
             continue
@@ -150,7 +159,7 @@ def process_one_label(explain_types, model_path, target_label, root_image_path, 
         imag, base_imag, prefix_file_names = load_image_v1(baseline_target, trans_f,
                                                            all_images,
                                                            target_size,
-                                                           normalized_factor)
+                                                           normalized_factor, baseline_type)
         if len(base_imag) == 0:
             shutil.rmtree(output_path)
             continue
@@ -211,7 +220,8 @@ def process_one_label(explain_types, model_path, target_label, root_image_path, 
         # }
         explain_dict = {}
         for key in explain_dict_target.keys():
-            if key in ["intgrad", "intgrad_base", "deeplift", "deeplift_base"]:
+            # ["expected_intgrad", "intgrad", "intgrad_base", "deeplift", "deeplift_base", "occlusion"]
+            if key in ["expected_intgrad", "intgrad", "intgrad_base", "deeplift", "deeplift_base"]:
                 explain_dict[key] = explain_dict_target.get(key) - explain_dict_baseline.get(key)
             else:
                 explain_dict[key] = explain_dict_target.get(key)
@@ -270,18 +280,19 @@ if __name__ == '__main__':
     # model_path = "/home/ptien/from_ss/mnist1/model_mnist1_keras.h5"
     model_path = "/home/ptien/from_ss/shap2/mnist/model_mnist_keras.h5"
     root_image_path = "/home/ptien/from_ss/2020-09-20/mnist/"
-    explain_types = ["expected_intgrad", "intgrad", "intgrad_base", "deeplift", "deeplift_base"]
+    explain_types = ["expected_intgrad", "intgrad", "intgrad_base", "deeplift", "deeplift_base", "occlusion"]
+    # explain_types = ["occlusion"]
     # target_size=[256, 256, 3]
     target_size=[28, 28, 1]
-    baseline_type = "gan"
+    baseline_type = "closet" # "gan"
     # "blur_0":"blur_1":"uniform":"gaussian_0":"gaussian_1":
     # noise_type = "blur_0" # None
     # blur: 5-50, gaussian: 0.5 -3
     # noise_scale = 5 # None
-    noise_type_arr = ["blur_0", "blur_1", "uniform", "gaussian_0", "gaussian_1"]
+    noise_type_arr = [None, "blur_0", "blur_1", "uniform", "gaussian_0", "gaussian_1"]
     noise_scale_dict = {
-        "blur": [5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
-        "gaussian": np.arange(0.5, 3, 0.5),
+        "blur": [0.1, 0.5, 1, 2],
+        "gaussian": np.arange(0.1, 2, 0.5),
         "uniform": [None]
     }
     
@@ -290,14 +301,14 @@ if __name__ == '__main__':
     stochastic_mask_flag = False
     all_classes = range(num_class)
     for noise_type in noise_type_arr:
-        if "blur" in noise_type:
+        if noise_type is None:
+            noise_scale_choice = [None]
+        elif "blur" in noise_type:
             noise_scale_choice = noise_scale_dict["blur"]
         elif "gaussian" in noise_type:
             noise_scale_choice = noise_scale_dict["blur"]
         elif "uniform" in noise_type:
             noise_scale_choice = noise_scale_dict["uniform"]
-        elif noise_type is None:
-            noise_scale_choice = [None]
         else:
             raise Exception(f"unknown noise type: {noise_type}")
         for noise_scale in noise_scale_choice:

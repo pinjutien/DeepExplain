@@ -78,7 +78,9 @@ def explain_model(model_path,
                 attributions_ = de.explain("intgrad", target_tensor, input_tensor, xs, ys=ys,
                                            baseline=base_for_exp_ig, steps=steps, stochastic_mask_flag=type_)
                 output[type_] = attributions_
-                
+            elif type_ == "occlusion":
+                attributions_ = de.explain(type_, target_tensor, input_tensor, xs, ys=ys)
+                output[type_] = attributions_
             else:
                 attributions_ = de.explain(type_, target_tensor, input_tensor, xs, ys=ys, baseline=None, steps=steps, stochastic_mask_flag=False)
                 output[type_] = attributions_
