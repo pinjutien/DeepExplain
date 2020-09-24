@@ -221,7 +221,7 @@ def process_one_label(explain_types, model_path, target_label, root_image_path, 
         explain_dict = {}
         for key in explain_dict_target.keys():
             # ["expected_intgrad", "intgrad", "intgrad_base", "deeplift", "deeplift_base", "occlusion"]
-            if key in ["expected_intgrad", "intgrad", "intgrad_base", "deeplift", "deeplift_base"]:
+            if key in ["expected_intgrad", "intgrad", "intgrad_base", "deeplift", "deeplift_base", "occlusion"]:
                 explain_dict[key] = explain_dict_target.get(key) - explain_dict_baseline.get(key)
             else:
                 explain_dict[key] = explain_dict_target.get(key)
@@ -284,7 +284,7 @@ if __name__ == '__main__':
     # explain_types = ["occlusion"]
     # target_size=[256, 256, 3]
     target_size=[28, 28, 1]
-    baseline_type = "closet" # "gan"
+    baseline_type = "gan" # "closet" # 
     # "blur_0":"blur_1":"uniform":"gaussian_0":"gaussian_1":
     # noise_type = "blur_0" # None
     # blur: 5-50, gaussian: 0.5 -3
