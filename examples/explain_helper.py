@@ -73,7 +73,9 @@ def explain_model(model_path,
                                                 baseline=base_imag, steps=steps, stochastic_mask_flag=stochastic_mask_flag)
                 output[type_] = attributions_base_
             elif type_ == "expected_intgrad":
-                # import pdb; pdb.set_trace()
+                preds = model.predict(xs)
+                ys = [np.argmax(preds[i]) for i in range(len(preds))]
+                ys = tf.keras.utils.to_categorical(ys, num_class)
                 base_for_exp_ig = get_baseline_data(data_type, y_label, subsample=steps)
                 attributions_ = de.explain("intgrad", target_tensor, input_tensor, xs, ys=ys,
                                            baseline=base_for_exp_ig, steps=steps, stochastic_mask_flag=type_)
@@ -145,7 +147,6 @@ def kernel_density(original_image, gan_image, file_name, bandwidth = 0.02, op="m
         if custom_std:
             bandwidth = custom_std*X.std()
         if iqr_choice:
-            # import pdb; pdb.set_trace()
             iqr_num = iqr(X)
             bandwidth = 0.9* min(X.std(), iqr_num/1.34)*pow(n, -0.2)
             

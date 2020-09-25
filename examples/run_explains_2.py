@@ -68,9 +68,7 @@ def load_image_v1(baseline_target, base_image_path, all_images,
     print(f"target_size: {target_size}")
     base_image_array = []
     prefix_file_array = []
-    # import pdb; pdb.set_trace()
     for image_f in all_images:
-        # imag_path = image_path + f
         file_name = os.path.basename(image_f)
         prefix_file_name = os.path.basename(file_name).split(".")[0]
         if baseline_type == "gan":
@@ -221,11 +219,12 @@ def process_one_label(explain_types, model_path, target_label, root_image_path, 
         explain_dict = {}
         for key in explain_dict_target.keys():
             # ["expected_intgrad", "intgrad", "intgrad_base", "deeplift", "deeplift_base", "occlusion"]
-            if key in ["expected_intgrad", "intgrad", "intgrad_base", "deeplift", "deeplift_base", "occlusion"]:
+            if key in ["intgrad", "intgrad_base", "deeplift", "deeplift_base", "occlusion"]:
                 explain_dict[key] = explain_dict_target.get(key) - explain_dict_baseline.get(key)
+            elif key in ["expected_intgrad"]:
+                explain_dict[key] = explain_dict_baseline.get(key)
             else:
                 explain_dict[key] = explain_dict_target.get(key)
-                
         nrows = num_imag
         kernel_plot = 0
         ncols = 2 + len(explain_types)+kernel_plot # 6
@@ -281,6 +280,7 @@ if __name__ == '__main__':
     model_path = "/home/ptien/from_ss/shap2/mnist/model_mnist_keras.h5"
     root_image_path = "/home/ptien/from_ss/2020-09-20/mnist/"
     explain_types = ["expected_intgrad", "intgrad", "intgrad_base", "deeplift", "deeplift_base", "occlusion"]
+    # explain_types = ["expected_intgrad"]
     # explain_types = ["occlusion"]
     # target_size=[256, 256, 3]
     target_size=[28, 28, 1]
@@ -290,6 +290,8 @@ if __name__ == '__main__':
     # blur: 5-50, gaussian: 0.5 -3
     # noise_scale = 5 # None
     noise_type_arr = [None, "blur_0", "blur_1", "uniform", "gaussian_0", "gaussian_1"]
+    # noise_type_arr = [None]
+    # noise_type_arr = [None]
     noise_scale_dict = {
         "blur": [0.1, 0.5, 1, 2],
         "gaussian": np.arange(0.1, 2, 0.5),
@@ -299,7 +301,8 @@ if __name__ == '__main__':
     normalized_factor=255.0
     num_class = 10
     stochastic_mask_flag = False
-    all_classes = range(num_class)
+    # all_classes = range(num_class)
+    all_classes = [8]
     for noise_type in noise_type_arr:
         if noise_type is None:
             noise_scale_choice = [None]
