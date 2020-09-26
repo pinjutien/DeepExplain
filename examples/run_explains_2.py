@@ -209,7 +209,6 @@ def process_one_label(explain_types, model_path, target_label, root_image_path, 
                                          steps=200,
                                          stochastic_mask_flag=False)
             explain_dict_arr += [explain_dict_]
-
         explain_dict_target = explain_dict_arr[0]
         explain_dict_baseline = explain_dict_arr[1]
         # explain_dict = {
@@ -278,19 +277,17 @@ if __name__ == '__main__':
     # root_image_path = "/home/ptien/from_ss/sanity_check/"
     # model_path = "/home/ptien/from_ss/mnist1/model_mnist1_keras.h5"
     model_path = "/home/ptien/from_ss/shap2/mnist/model_mnist_keras.h5"
-    root_image_path = "/home/ptien/from_ss/2020-09-20/mnist/"
+    root_image_path = "/home/ptien/from_ss/2020-09-26/mnist/"
     explain_types = ["expected_intgrad", "intgrad", "intgrad_base", "deeplift", "deeplift_base", "occlusion"]
-    # explain_types = ["expected_intgrad"]
     # explain_types = ["occlusion"]
     # target_size=[256, 256, 3]
     target_size=[28, 28, 1]
-    baseline_type = "gan" # "closet" # 
+    baseline_type = "gan" #  "closet" #  
     # "blur_0":"blur_1":"uniform":"gaussian_0":"gaussian_1":
     # noise_type = "blur_0" # None
     # blur: 5-50, gaussian: 0.5 -3
     # noise_scale = 5 # None
     noise_type_arr = [None, "blur_0", "blur_1", "uniform", "gaussian_0", "gaussian_1"]
-    # noise_type_arr = [None]
     # noise_type_arr = [None]
     noise_scale_dict = {
         "blur": [0.1, 0.5, 1, 2],
@@ -301,8 +298,8 @@ if __name__ == '__main__':
     normalized_factor=255.0
     num_class = 10
     stochastic_mask_flag = False
-    # all_classes = range(num_class)
-    all_classes = [8]
+    all_classes = range(num_class)
+    # all_classes = [8]
     for noise_type in noise_type_arr:
         if noise_type is None:
             noise_scale_choice = [None]

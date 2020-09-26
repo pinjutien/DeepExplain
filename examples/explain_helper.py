@@ -74,10 +74,10 @@ def explain_model(model_path,
                 output[type_] = attributions_base_
             elif type_ == "expected_intgrad":
                 preds = model.predict(xs)
-                ys = [np.argmax(preds[i]) for i in range(len(preds))]
-                ys = tf.keras.utils.to_categorical(ys, num_class)
+                ys_ = [np.argmax(preds[i]) for i in range(len(preds))]
+                ys_1 = tf.keras.utils.to_categorical(ys_, num_class)
                 base_for_exp_ig = get_baseline_data(data_type, y_label, subsample=steps)
-                attributions_ = de.explain("intgrad", target_tensor, input_tensor, xs, ys=ys,
+                attributions_ = de.explain("intgrad", target_tensor, input_tensor, xs, ys=ys_1,
                                            baseline=base_for_exp_ig, steps=steps, stochastic_mask_flag=type_)
                 output[type_] = attributions_
             elif type_ == "occlusion":
